@@ -1,6 +1,7 @@
 # Nikhil Bhaip
 # yt_trending_v2.py
 # TODO: Use File I/O and LOG info
+# TODO: Rigorous Unit Tests
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,6 +15,15 @@ YOUTUBE_URL = "https://www.youtube.com/feed/trending"
 PARSER = "html.parser"
 HOST = "localhost"
 PORT = 5432
+
+TABLE_EXISTS_QUERY = "SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s)"
+YT_TABLE = 'yt_table'
+CREATE_TABLE_QUERY = """CREATE TABLE yt_table(
+          title TEXT,
+          views INTEGER,
+          duration TEXT
+          )"""
+INSERT_ROW_QUERY = "INSERT INTO yt_table (title, views, duration) VALUES (%s, %s, %s);"
 
 
 # This class holds information about each video and a list of all_videos
@@ -99,6 +109,30 @@ def get_row_and_clean(rows, video_list_info, case="none"):
             clean(row_text, video_list_info, case)
 
 
+def get_database_info():
+    db = input("Enter database name: ")
+    uname = input("Enter username: ")
+    pword = input("Enter password: ")
+    return db, uname, pword
+
+
+# Returns true if YT_TABLE exists in the database
+def check_table_exists(cur):
+    cur.execute(TABLE_EXISTS_QUERY, (YT_TABLE,))
+    return cur.fetchone()[0]
+
+
+def make_table(cur, yt_data):
+    cur.execute(CREATE_TABLE_QUERY)
+
+    for video in yt_data:
+
+        data = (video.title, video.view, video.duration)
+        cur.execute(INSERT_ROW_QUERY, data)
+
+    print("yt_table was successfully created and populated")
+
+
 def main():
     content = get_page_content()
 
@@ -114,16 +148,30 @@ def main():
     get_row_and_clean(view_rows, video_list_info, case="views")
     get_row_and_clean(title_time_rows, video_list_info, case="title_and_duration")
 
-    # TODO Use File I/O to hold DB credentials
-    db = input("Enter database name: ")
-    uname = input("Enter username: ")
-    pwd = input("Enter password: ")
+    # organize YouTube data into one list
+    yt_data = video_list_info.get_video_list()
 
+    # Connect to Database
+    # TODO Use File I/O to hold DB credentials
+    db, uname, pword = get_database_info()
+
+    # FIXME: Fix database authentication error handling
     try:
-        conn = psycopg2.connect(database=db, user=uname, password=pwd, host=HOST, port=PORT)
+        conn = psycopg2.connect(database=db, user=uname, password=pword, host=HOST, port=PORT)
     except psycopg2.OperationalError:
         raise Exception("Cannot connect to database.")
 
+    cur = conn.cursor()
+
+    table_exists = check_table_exists(cur)
+
+    if not table_exists:
+        make_table(cur, yt_data)
+    else:
+        print("yt_table has already been created and populated")
+
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     main()
