@@ -22,7 +22,7 @@ for i, row in enumerate(view_rows):
     ago_index = row_text.index("ago")
     views_index = row_text.index("views")
 
-    if(views_index > ago_index):
+    if views_index > ago_index:
         view_string = row_text[(ago_index+3):(views_index-1)]
         view = view_string.replace(',', '')
 
@@ -32,7 +32,7 @@ for i, row in enumerate(view_rows):
 for i, row in enumerate(title_rows):
 
     if i not in [4, 5, 6, 7, 8, 9]:
-        print(row.get_text())
+        # print(row.get_text())
 
         row_text = title_rows[i].get_text()
 
@@ -49,7 +49,7 @@ for i, row in enumerate(title_rows):
 yt_data = list(zip(title_list, view_list, time_list))
 # _____________________________________________________________________________________________________________________
 
-conn = psycopg2.connect(database="nikhil", user="postgres", password = "", host = "localhost", port = "5432")
+conn = psycopg2.connect(database="nikhil", user="postgres", password="", host="localhost", port="5432")
 
 print("Opened database successfully")
 
@@ -85,3 +85,4 @@ else:
 
 conn.commit()
 conn.close()
+
