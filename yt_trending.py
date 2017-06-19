@@ -6,6 +6,7 @@
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
+import os
 
 # "Creator on The Rise" does not count as trending, so I will exclude these videos
 # Their ordinal positions are enumerated below
@@ -13,8 +14,7 @@ SKIP_ROW_NUMS = [4, 5, 6, 7, 8, 9]
 
 YOUTUBE_URL = "https://www.youtube.com/feed/trending"
 PARSER = "html.parser"
-HOST = "localhost"
-PORT = 5432
+
 
 TABLE_EXISTS_QUERY = "SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s)"
 YT_TABLE = 'yt_table'
@@ -71,6 +71,9 @@ class VideoListInfo:
             raise Exception("Error: Lengths of information lists don't match. \nExiting...")
 
 
+
+
+
 # TODO Gets page content from general URL (CHANGE URL procedures)
 def get_page_content():
     page = requests.get(YOUTUBE_URL)
@@ -110,10 +113,13 @@ def get_row_and_clean(rows, video_list_info, case="none"):
 
 
 def get_database_info():
-    db = input("Enter database name: ")
-    uname = input("Enter username: ")
-    pword = input("Enter password: ")
-    return db, uname, pword
+    # db credentials are saved in an environment variable
+    db_name = os.getenv("DATABASE_NAME")
+    user = os.getenv("DATABASE_USER")
+    password = os.getenv("DATABASE_PWD")
+    host = os.getenv("DATABASE_HOST")
+    port = os.getenv("DATABASE_PORT")
+    return db_name, user, password, host, port
 
 
 # Returns true if YT_TABLE exists in the database
@@ -152,12 +158,11 @@ def main():
     yt_data = video_list_info.get_video_list()
 
     # Connect to Database
-    # TODO Use File I/O to hold DB credentials
-    db, uname, pword = get_database_info()
+    db, uname, pword, host, port = get_database_info()
 
     # FIXME: Fix database authentication error handling
     try:
-        conn = psycopg2.connect(database=db, user=uname, password=pword, host=HOST, port=PORT)
+        conn = psycopg2.connect(database=db, user=uname, password=pword, host=host, port=port)
     except psycopg2.Error:
         raise Exception("Cannot connect to database.")
 
