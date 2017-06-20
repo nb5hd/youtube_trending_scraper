@@ -38,7 +38,7 @@ class Video:
         self.all_videos.append(self)
 
     def __str__(self):
-        return "Title: " + self.title + "\nView: " + str(self.view) + "\nDuration: " + str(self.duration)
+        return "Title: " + self.title + "\nView: " + str(self.view) + "\nDuration: " + str(self.duration) + "\n"
 
 
 class VideoListInfo:
@@ -76,38 +76,84 @@ def get_page_content():
     page = requests.get(YOUTUBE_URL)
     return BeautifulSoup(page.content, PARSER)
 
-# TODO create a class that holds video_list_info and case_info to avoid extraneous args in methods...
+
+class Clean(object):
+    def __init__(self, rows=None, video_list_info=None):
+        self.video_list_info = video_list_info
+        self.rows = rows
+
+    def get_row_and_clean(self):
+        for i, row in enumerate(self.rows):
+            if i not in SKIP_ROW_NUMS:
+                row_text = row.get_text()
+                self.clean(row_text)
+
+    def clean(self, row_text):
+        pass
 
 
-def clean(row_text, video_list_info, case):
-    if case == "views":
+class CleanViews(Clean):
+    def __init__(self, rows=None, video_list_info=None):
+        super().__init__(rows, video_list_info)
+
+    def get_row_and_clean(self):
+        super().get_row_and_clean()
+
+    def clean(self, row_text):
         ago_index = row_text.index("ago")
         views_index = row_text.index("views")
 
         view_string = row_text[(ago_index + 3):(views_index - 1)]
         view = view_string.replace(',', '')
 
-        video_list_info.add_view(view)
-    elif case == "title_and_duration":
+        self.video_list_info.add_view(view)
+
+
+class CleanTitleAndDuration(Clean):
+    def __init__(self, rows=None, video_list_info=None):
+        super().__init__(rows, video_list_info)
+
+    def get_row_and_clean(self):
+        super().get_row_and_clean()
+
+    def clean(self, row_text):
         duration_index = row_text.index("Duration")
 
         title = row_text[:(duration_index - 3)]
-        video_list_info.add_title(title)
+        self.video_list_info.add_title(title)
 
-        duration = row_text[(duration_index+10):-1]
-        video_list_info.add_duration(duration)
-    else:
-        raise Exception("Invalid case entered")
+        duration = row_text[(duration_index + 10):-1]
+        self.video_list_info.add_duration(duration)
 
 
-def get_row_and_clean(rows, video_list_info, case="none"):
-    if not isinstance(video_list_info, VideoListInfo):
-        raise Exception("Invalid video_list_info type")
-    for i, row in enumerate(rows):
-        if i not in SKIP_ROW_NUMS:
-            row_text = row.get_text()
-            clean(row_text, video_list_info, case)
-
+# def clean(row_text, video_list_info, case):
+#     if case == "views":
+#         ago_index = row_text.index("ago")
+#         views_index = row_text.index("views")
+#
+#         view_string = row_text[(ago_index + 3):(views_index - 1)]
+#         view = view_string.replace(',', '')
+#
+#         video_list_info.add_view(view)
+#     elif case == "title_and_duration":
+#         duration_index = row_text.index("Duration")
+#
+#         title = row_text[:(duration_index - 3)]
+#         video_list_info.add_title(title)
+#
+#         duration = row_text[(duration_index+10):-1]
+#         video_list_info.add_duration(duration)
+#     else:
+#         raise Exception("Invalid case entered")
+#
+#
+# def get_row_and_clean(rows, video_list_info, case="none"):
+#     if not isinstance(video_list_info, VideoListInfo):
+#         raise Exception("Invalid video_list_info type")
+#     for i, row in enumerate(rows):
+#         if i not in SKIP_ROW_NUMS:
+#             row_text = row.get_text()
+#             clean(row_text, video_list_info, case)
 
 
 def get_database_info():
@@ -149,33 +195,39 @@ def main():
 
     video_list_info = VideoListInfo()
 
+    view_cleaner = CleanViews(view_rows, video_list_info)
+    view_cleaner.get_row_and_clean()
 
-    get_row_and_clean(view_rows, video_list_info, case="views")
-    get_row_and_clean(title_time_rows, video_list_info, case="title_and_duration")
+    title_time_cleaner = CleanTitleAndDuration(title_time_rows, video_list_info)
+    title_time_cleaner.get_row_and_clean()
 
     # organize YouTube data into one list
     yt_data = video_list_info.get_video_list()
 
-    # Connect to Database
-    db, uname, pword, host, port = get_database_info()
+    for vid in yt_data:
+        print(vid)
 
-    # FIXME: Fix database authentication error handling
-    try:
-        conn = psycopg2.connect(database=db, user=uname, password=pword, host=host, port=port)
-    except psycopg2.Error:
-        raise Exception("Cannot connect to database.")
 
-    cur = conn.cursor()
-
-    table_exists = check_table_exists(cur)
-
-    if not table_exists:
-        make_table(cur, yt_data)
-    else:
-        print("yt_table has already been created and populated")
-
-    conn.commit()
-    conn.close()
+    # # Connect to Database
+    # db, uname, pword, host, port = get_database_info()
+    #
+    # # FIXME: Fix database authentication error handling
+    # try:
+    #     conn = psycopg2.connect(database=db, user=uname, password=pword, host=host, port=port)
+    # except psycopg2.Error:
+    #     raise Exception("Cannot connect to database.")
+    #
+    # cur = conn.cursor()
+    #
+    # table_exists = check_table_exists(cur)
+    #
+    # if not table_exists:
+    #     make_table(cur, yt_data)
+    # else:
+    #     print("yt_table has already been created and populated")
+    #
+    # conn.commit()
+    # conn.close()
 
 if __name__ == "__main__":
     main()
