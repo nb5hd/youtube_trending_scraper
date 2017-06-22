@@ -28,14 +28,11 @@ INSERT_ROW_QUERY = "INSERT INTO yt_table (title, views, duration) VALUES (%s, %s
 
 # This class holds information about each video and a list of all_videos
 class Video:
-    # class variable "all_videos" holds all videos ever instantiated
-    all_videos = []
 
     def __init__(self, title="", view=-1, duration=-1):
         self.title = title
         self.view = view
         self.duration = duration
-        self.all_videos.append(self)
 
     def __str__(self):
         return "Title: " + self.title + "\nView: " + str(self.view) + "\nDuration: " + str(self.duration) + "\n"
@@ -45,6 +42,7 @@ class VideoListInfo:
     view_list = []
     title_list = []
     duration_list = []
+    video_info = {"views": [],"title": [],"duration": []}
 
     def __init__(self):
         pass
@@ -58,6 +56,10 @@ class VideoListInfo:
 
     def add_duration(self, duration):
         self.duration_list.append(duration)
+
+    # def add_item(self, item, category):
+    #     if category in video_
+    #     self.all_video_data[category].append(item)
 
     # TODO Write general template code for converting 'n' lists into a video with 'n' params. (**kwargs maybe?)
     def get_video_list(self):
@@ -77,22 +79,25 @@ def get_page_content():
     return BeautifulSoup(page.content, PARSER)
 
 
-class Clean(object):
+class Cleaner(object):
     def __init__(self, rows=None, video_list_info=None):
         self.video_list_info = video_list_info
         self.rows = rows
+        # self.cleaned_data = []
 
     def get_row_and_clean(self):
         for i, row in enumerate(self.rows):
             if i not in SKIP_ROW_NUMS:
                 row_text = row.get_text()
                 self.clean(row_text)
+                # cleaned_item = self.clean(row_text)
+                # self.cleaned_data.append(cleaned_item)
 
     def clean(self, row_text):
         pass
 
 
-class CleanViews(Clean):
+class ViewsCleaner(Cleaner):
     def __init__(self, rows=None, video_list_info=None):
         super().__init__(rows, video_list_info)
 
@@ -106,10 +111,11 @@ class CleanViews(Clean):
         view_string = row_text[(ago_index + 3):(views_index - 1)]
         view = view_string.replace(',', '')
 
+        # return view
         self.video_list_info.add_view(view)
 
 
-class CleanTitleAndDuration(Clean):
+class TitleAndDurationCleaner(Cleaner):
     def __init__(self, rows=None, video_list_info=None):
         super().__init__(rows, video_list_info)
 
@@ -193,12 +199,13 @@ def main():
     if len(view_rows) != len(title_time_rows):
         raise Exception("Error: Mismatch between length of number of views and number of titles. \nExiting...")
 
+    # stores information about videos in different lists
     video_list_info = VideoListInfo()
 
-    view_cleaner = CleanViews(view_rows, video_list_info)
+    view_cleaner = ViewsCleaner(view_rows, video_list_info)
     view_cleaner.get_row_and_clean()
 
-    title_time_cleaner = CleanTitleAndDuration(title_time_rows, video_list_info)
+    title_time_cleaner = TitleAndDurationCleaner(title_time_rows, video_list_info)
     title_time_cleaner.get_row_and_clean()
 
     # organize YouTube data into one list
@@ -208,26 +215,26 @@ def main():
         print(vid)
 
 
-    # # Connect to Database
-    # db, uname, pword, host, port = get_database_info()
-    #
-    # # FIXME: Fix database authentication error handling
-    # try:
-    #     conn = psycopg2.connect(database=db, user=uname, password=pword, host=host, port=port)
-    # except psycopg2.Error:
-    #     raise Exception("Cannot connect to database.")
-    #
-    # cur = conn.cursor()
-    #
-    # table_exists = check_table_exists(cur)
-    #
-    # if not table_exists:
-    #     make_table(cur, yt_data)
-    # else:
-    #     print("yt_table has already been created and populated")
-    #
-    # conn.commit()
-    # conn.close()
+    # Connect to Database
+    db, uname, pword, host, port = get_database_info()
+
+    # FIXME: Fix database authentication error handling
+    try:
+        conn = psycopg2.connect(database=db, user=uname, password=pword, host=host, port=port)
+    except psycopg2.Error:
+        raise Exception("Cannot connect to database.")
+
+    cur = conn.cursor()
+
+    table_exists = check_table_exists(cur)
+
+    if not table_exists:
+        make_table(cur, yt_data)
+    else:
+        print("yt_table has already been created and populated")
+
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     main()
