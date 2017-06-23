@@ -43,13 +43,20 @@ class VideoDB(object):
     def add_duration(self, duration, title):
         self.video_dict[title]["duration"] = duration
 
+    def add_youtuber(self, youtuber, title):
+        self.video_dict[title]["youtuber"] = youtuber
+
+    def add_view(self, title, date, view):
+        self.video_dict[title]["time_dependent"][date]["views"] = view
+
     def __str__(self):
         ret_val = ""
         for title, info in self.video_dict.items():
-            ret_val += title + "\n\t" + str(info["duration"]) + "\n\t"
+            ret_val += title + "\n\t" + str(info["youtuber"]) + "\n\t" + str(info["duration"]) + "\n\t"
             for date, date_info in info["time_dependent"].items():
-                ret_val += date.strftime("%m/%d/%y") + ": "
-                ret_val += "Rank is: " + str(date_info["rank"]) + "\n\n"
+                ret_val += date.strftime("%m/%d/%y") + "\n\t\t "
+                ret_val += "View Count: " + str(date_info["views"]) + "\n\t\t"
+                ret_val += " Rank: " + str(date_info["rank"]) + "\n\n"
         return ret_val
 
 
@@ -73,11 +80,24 @@ class Duration:
 
     def __str__(self):
         if self.hours > 0:
-            return str(self.hours)+":"+str(self.minutes)+":"+str(self.seconds)
+            if self.minutes > 9 and self.seconds > 9:
+                return str(self.hours)+":"+str(self.minutes)+":"+str(self.seconds)
+            elif self.minutes < 9 and self.seconds > 9:
+                return str(self.hours) + ":0" + str(self.minutes) + ":" + str(self.seconds)
+            elif self.minutes > 9 and self.seconds < 9:
+                return  str(self.hours) + ":" + str(self.minutes) + ":0" + str(self.seconds)
+            else:
+                return str(self.hours) + ":0" + str(self.minutes) + ":0" + str(self.seconds)
         elif self.minutes > 0:
-            return str(self.minutes) + ":" + str(self.seconds)
+            if self.seconds > 9:
+                return str(self.minutes) + ":" + str(self.seconds)
+            else:
+                return str(self.minutes) + ":0" + str(self.seconds)
         else:
-            return "0:" + str(self.seconds)
+            if self.seconds > 9:
+                return "0:" + str(self.seconds)
+            else:
+                return "0:0" + str(self.seconds)
 
 
 # TODO Gets page content from general URL (CHANGE URL procedures)
@@ -205,6 +225,20 @@ def title_retriever(title_list):
     return ret_list
 
 
+def views_retriever(views_list):
+    ret_list = []
+    for i, row in enumerate(views_list):
+        ago_index = row.index("ago")
+        views_index = row.index("views")
+        if views_index > ago_index:
+            view_string = row[(ago_index + 3):(views_index - 1)]
+        else:
+            view_string = row[:(views_index - 1)]
+        view = view_string.replace(',', '')
+        ret_list.append(view)
+    return ret_list
+
+
 # Get the duration from html_text
 def duration_retriever(duration_list):
     ret_list = []
@@ -243,6 +277,25 @@ def main():
         title = todays_feed_order[i+1]
         duration_obj = Duration(duration_str)
         video_db.add_duration(duration_obj, title)
+
+    # Third pass is to get views and populate video_db
+    view_rows = content.find_all(class_="yt-lockup-meta-info")
+    raw_views_list = [row.get_text() for row in list(view_rows)]
+    views_list = views_retriever(raw_views_list)
+
+    for i, view in enumerate(views_list):
+        title = todays_feed_order[i + 1]
+        video_db.add_view(title, today, view)
+
+    # Fourth pass is to get YouTuber and populate video_db
+
+    youtuber_rows = content.find_all(class_="yt-lockup-byline")
+    raw_youtuber_list = [row.get_text() for row in list(youtuber_rows)]
+    youtuber_list = [row.strip("\xa0") if "\xa0" in row else row for row in raw_youtuber_list]
+
+    for i, youtuber in enumerate(youtuber_list):
+         title = todays_feed_order[i + 1]
+         video_db.add_youtuber(youtuber, title)
 
     with open("output.txt", "w") as text_file:
         print(video_db, file=text_file)
